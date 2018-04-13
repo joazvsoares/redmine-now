@@ -1,19 +1,10 @@
 'use strict';
 
 (() => {
-  const appMenu = require('./menu');
-  const util = require('./util');
-  const electron = require('electron');
-  const ipcRenderer = electron.ipcRenderer;
-  const remote = electron.remote;
-  const BrowserWindow = remote.BrowserWindow;
-  const shell = remote.shell;
-  const Menu = remote.Menu;
-
-  const isMac = process.platform === 'darwin';
-
+  
   const defaultUpdateIntervalSec = 600;
-
+  const isMac = false;
+  
   let isDarkMode = JSON.parse(localStorage.getItem('isDarkMode'));
 
   class RedmineNow {
@@ -28,73 +19,14 @@
     }
 
     initMenu() {
-      Menu.setApplicationMenu(appMenu);
       return this;
     }
 
     initEventListener() {
-      ipcRenderer.on('toggle-dark-mode', () => {
-        this.toggleDarkMode();
-      });
-
-      ipcRenderer.on('open-settings-window', () => {
-        this.openSettingsWindow();
-      });
-
-      ipcRenderer.on('save-settings', () => {
-        this._needsUpdateStatus = true;
-        this.readStoredSettings()
-          .overlay()
-          .initFetch();
-      });
+      this.toggleDarkMode();
 
       document.getElementById('open-settings-button').addEventListener('click', () => {
         this.openSettingsWindow();
-      });
-
-      remote.getCurrentWindow().on('close', () => {
-        this.removeBaseTime();
-      });
-
-      return this;
-    }
-
-    openSettingsWindow() {
-      if (this._settingsWindow !== null) {
-        return this;
-      }
-
-      this._settingsWindow = new BrowserWindow({
-        title: 'Settings',
-        show: false,
-        resizable: false,
-        maximizable: false,
-        fullscreenable: false,
-        width: isMac ? 540 : 555,
-        height: isMac ? 240 : 265,
-        parent: isMac ? null : remote.getCurrentWindow(),
-        titleBarStyle: isMac ? 'hidden' : 'default'
-      });
-
-      if (!isMac) {
-        this._settingsWindow.setMenuBarVisibility(false);
-      }
-
-      this._settingsWindow.loadURL(`file://${__dirname}/settings.html`);
-
-      this._settingsWindow.once('ready-to-show', () => {
-        if (isMac) {
-          this._settingsWindow.setParentWindow(remote.getCurrentWindow());
-        }
-        this._settingsWindow.show();
-      });
-
-      this._settingsWindow.on('closed', () => {
-        this._settingsWindow = null;
-      });
-
-      this._settingsWindow.webContents.on('did-finish-load', () => {
-        this._settingsWindow.webContents.send('load-settings-window', this._startupTime);
       });
 
       return this;
@@ -255,7 +187,7 @@
     getRequestParams(page) {
       const lastExecutionTime = localStorage.getItem('lastExecutionTime');
       const params = [
-        `updated_on=%3E%3D${lastExecutionTime}`,
+        `updated_on=%3C%3D${lastExecutionTime}`,
         'status_id=*',
         'sort=updated_on:asc',
         'limit=100',
@@ -331,6 +263,20 @@
       return this;
     }
 
+	formatDate(date, todayTime = null){
+	  const year = date.getFullYear();
+	  const month = `0${date.getMonth() + 1}`.slice(-2);
+	  const day = `0${date.getDate()}`.slice(-2);
+	  const hour = `0${date.getHours()}`.slice(-2);
+	  const minute = `0${date.getMinutes()}`.slice(-2);
+	  const dateTime = new Date(year, date.getMonth(), day).getTime();
+
+	  if (todayTime === dateTime) {
+		return `${hour}:${minute}`;
+	  }
+	  return `${year}-${month}-${day} ${hour}:${minute}`;
+	};
+
     createIssueElement(issueElementId, issue, todayTime, url) {
       const issueElement = document.createElement('div');
       issueElement.id = issueElementId;
@@ -355,12 +301,12 @@
       }
 
       const updatedOnElement = document.createElement('div');
-      updatedOnElement.innerText = util.formatDate(new Date(issue.updated_on), todayTime);
+      updatedOnElement.innerText = this.formatDate(new Date(issue.updated_on), todayTime);
       updatedOnElement.className = 'updated-on';
       issueElement.appendChild(updatedOnElement);
 
       issueElement.addEventListener('click', () => {
-        shell.openExternal(`${url}/issues/${issue.id}`);
+		window.open(`${url}/issues/${issue.id}`, '_blank');
       });
 
       return issueElement;
@@ -398,9 +344,9 @@
         apiKey: localStorage.getItem('apiKey'),
         projectId: localStorage.getItem('projectId'),
         updateInterval: localStorage.getItem('updateInterval'),
-        baseTime: localStorage.getItem('baseTime')
+        baseTime: null
       };
-
+	  
       return this;
     }
 
@@ -439,8 +385,6 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     document.body.classList.toggle('dark', isDarkMode);
-
-    util.hideTitleBar();
   });
 
   window.addEventListener('load', () => {
