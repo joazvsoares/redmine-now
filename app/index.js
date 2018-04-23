@@ -77,6 +77,14 @@
         const headers = document.getElementById('headers');
         const container = document.getElementById('container');
         this._issueStatuses = JSON.parse(responseText).issue_statuses;
+		
+		// get only opened statuses
+		var i = this._issueStatuses.length
+		while (i--) {
+			if (this._issueStatuses[i].is_closed) {
+				this._issueStatuses.splice(i, 1);
+			} 
+		}
 
         const collapsedHeaders = headers.getElementsByClassName('collapsed');
         const collapsedIds = [];
@@ -188,7 +196,7 @@
       const lastExecutionTime = localStorage.getItem('lastExecutionTime');
       const params = [
         `updated_on=%3C%3D${lastExecutionTime}`,
-        'status_id=*',
+        'status_id=open',
         'sort=updated_on:asc',
         'limit=100',
         `page=${page}`
